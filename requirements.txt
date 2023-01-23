@@ -5,3 +5,5 @@ numpy==1.23.1
 pandas==1.5.0
 starknet.py==0.6.0a0
 checkthechain==0.3.0
+matplotlib==3.5.*
+jupyterlab==3.5.*
