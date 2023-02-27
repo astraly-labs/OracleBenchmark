@@ -12,7 +12,7 @@ CSV_FILE = "empiric-events.csv"
 def get_events():
     """If no JSON file in current directory, requests all events from StarkNet Indexer."""
     if not os.path.isfile(JSON_FILE):
-        chunk_size = 1_000_000
+        chunk_size = 100_000
         print(
             f"Requesting all SubmittedSpotEntry events from StarkNet Indexer. Using chunks of size {chunk_size} This might take a while..."
         )
@@ -27,9 +27,9 @@ def get_events():
                 + str(chunk_size)
                 + ", offset: "
                 + str(i * chunk_size)
-                + ', order_by: {id: asc}, where: {name: {_eq: "SubmittedEntry"}, transmitter_contract: {_eq: "0x12fadd18ec1a23a160cc46981400160fbf4a7a5eed156c4669e39807265bcd4"}}) { name arguments { value } transaction_hash }}'
+                + ', order_by: {id: asc}, where: {name: {_eq: "SubmittedSpotEntry"}, transmitter_contract: {_eq: "0x446812bac98c08190dee8967180f4e3cdcd1db9373ca269904acb17f67f7093"}}) { name arguments { value } transaction_hash }}'
             }
-            # TODO: Update contract address to Empiric 1.0 and change SubmittedEntry to SubmittedSpotEntry
+            print(request_json)
             r = requests.post(url=url, json=request_json)
             if r.status_code != 200:
                 raise Exception(
@@ -68,17 +68,24 @@ def format_events(data):
         }
         for event in events
     ]
-    return [
-        {key: int(value, 16) for key, value in event.items()}
+    # {'base': {'source': '0x434558', 'publisher': '0x454d5049524943', 'timestamp': '0x63474dcd'}, 'price': '0x1bf143e2b80', 'volume': '0x0', 'pair_id': '0x4254432f555344', 'transaction_hash': '0x636347e557bcb8be4e64bd5d91ef5e571afa4dec90cc2c22f164bb65cfcb44a'}
+    # Flatten the base object
+    formatted_events = [
+        {**event["base"], **event} for event in formatted_events
+    ]
+    formatted_events = [
+        {key: int(value, 16) for key, value in event.items() if key != "base"}
         for event in formatted_events
     ]
+    print(formatted_events[0])
+    return formatted_events
 
 
 def to_csv(formatted_events):
     print(f"Converting to {CSV_FILE}...")
     df = pd.DataFrame(formatted_events)
-    df["key"] = df["key"].apply(felt_to_str)
-    df["value"] = df["value"] / (10**18)
+    df["key"] = df["pair_id"].apply(felt_to_str)
+    df["value"] = df["price"] / (10**8)
     df["datetime"] = pd.to_datetime(df["timestamp"], unit="s")
     df["publisher"] = df["publisher"].apply(felt_to_str)
     df["source"] = df["source"].apply(felt_to_str)
